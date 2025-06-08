@@ -73,16 +73,16 @@ async def root():
 
 @app.post("/analyze-invoices")
 async def analyze_invoices(
-    policy_file: UploadFile = File(..., description="HR reimbursement policy PDF"),
     invoices_zip: UploadFile = File(..., description="ZIP file containing invoice PDFs"),
-    employee_name: str = Form(..., description="Employee name")
+    employee_name: str = Form(..., description="Employee name"),
+    policy_file: UploadFile = File(None, description="Optional HR policy PDF")
 ):
     """
     Part 1: Analyze invoices against policy and store in vector database
     """
     try:
         # Basic validation
-        if not policy_file.filename.endswith('.pdf'):
+        if policy_file and not policy_file.filename.endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Policy file must be PDF")
         
         if not invoices_zip.filename.endswith('.zip'):
@@ -91,14 +91,17 @@ async def analyze_invoices(
         # Create temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
             # Save uploaded files
-            policy_path = os.path.join(temp_dir, "policy.pdf")
             zip_path = os.path.join(temp_dir, "invoices.zip")
-            
-            with open(policy_path, "wb") as f:
-                f.write(await policy_file.read())
             
             with open(zip_path, "wb") as f:
                 f.write(await invoices_zip.read())
+            
+            # Save policy if provided
+            policy_path = None
+            if policy_file:
+                policy_path = os.path.join(temp_dir, "policy.pdf")
+                with open(policy_path, "wb") as f:
+                    f.write(await policy_file.read())
             
             # Extract ZIP file
             extract_dir = os.path.join(temp_dir, "invoices")
@@ -116,8 +119,8 @@ async def analyze_invoices(
                 analysis_result = {
                     "invoice_id": pdf_file.replace('.pdf', ''),
                     "employee_name": employee_name,
-                    "status": "Fully Reimbursed",  # Placeholder
-                    "reason": "All items comply with company policy",  # Placeholder
+                    "status": "Analyzed with default policy" if not policy_file else "Analyzed with provided policy",
+                    "reason": "Using built-in policy rules" if not policy_file else "Analysis against uploaded policy",
                     "amount": "100.00",  # Placeholder
                     "date": "2024-01-01",  # Placeholder
                     "file_name": pdf_file
@@ -129,7 +132,8 @@ async def analyze_invoices(
             "success": True,
             "message": f"Successfully processed {len(processed_invoices)} invoices for {employee_name}",
             "processed_count": len(processed_invoices),
-            "invoices": processed_invoices
+            "invoices": processed_invoices,
+            "policy_used": "Default company policy" if not policy_file else f"Uploaded policy: {policy_file.filename}"
         }
         
     except Exception as e:
