@@ -190,7 +190,7 @@ if __name__ == "__main__":
     # Run the application
     uvicorn.run(
         "main:app",
-        host=os.getenv("API_HOST", "localhost"),
+        host=os.getenv("API_HOST", "0.0.0.0"),
         port=int(os.getenv("API_PORT", 8000)),
         reload=os.getenv("DEBUG_MODE", "True").lower() == "true"
     )
