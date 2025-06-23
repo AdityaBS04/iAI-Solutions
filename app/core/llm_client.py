@@ -28,32 +28,18 @@ class LLMClient:
             "temperature": settings.temperature,
         }
     
-    def analyze_invoice(self, invoice_text: str, employee_name: str, policy_text: Optional[str] = None) -> Dict[str, Any]:
+    def analyze_invoice(self, invoice_text: str, policy_text: str, employee_name: str) -> Dict[str, Any]:
         """
         Analyze invoice against company policy using Gemini
         
         Args:
             invoice_text: Extracted text from invoice PDF
+            policy_text: Company reimbursement policy text
             employee_name: Name of employee submitting invoice
-            policy_text: Company reimbursement policy text (optional)
             
         Returns:
             Analysis result with status and reasoning
         """
-        
-        # Use default policy if none provided
-        if not policy_text:
-            policy_text = """
-DEFAULT COMPANY REIMBURSEMENT POLICY:
-1. Business meals: Maximum $50 per person per day
-2. Transportation: Actual costs with receipts
-3. Hotel accommodation: Reasonable rates with receipts
-4. Office supplies: Pre-approved purchases only
-5. Client entertainment: Maximum $100 per event with business justification
-6. All expenses must have valid receipts and business purpose
-7. Personal expenses are not reimbursable
-8. Alcohol expenses require special approval
-"""
         
         prompt = f"""
 You are an AI assistant analyzing employee expense reimbursements. 

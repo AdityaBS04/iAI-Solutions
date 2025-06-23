@@ -13,24 +13,24 @@ router = APIRouter(prefix="/api/v1", tags=["Invoice Analysis"])
 
 @router.post("/analyze-invoices")
 async def analyze_invoices(
+    policy_file: UploadFile = File(..., description="HR reimbursement policy PDF"),
     invoices_zip: UploadFile = File(..., description="ZIP file containing invoice PDFs"),
-    employee_name: str = Form(..., description="Employee name for invoice linking"),
-    policy_file: UploadFile = File(None, description="Optional HR reimbursement policy PDF")
+    employee_name: str = Form(..., description="Employee name for invoice linking")
 ) -> Dict[str, Any]:
     """
     Analyze employee invoices against company reimbursement policy
     
     Args:
+        policy_file: PDF file containing HR reimbursement policy
         invoices_zip: ZIP file with one or more invoice PDFs
         employee_name: Name of employee submitting invoices
-        policy_file: Optional PDF file containing HR reimbursement policy
         
     Returns:
         JSON response with analysis results and success status
     """
     
     # Validate file types
-    if policy_file and not policy_file.filename.endswith('.pdf'):
+    if not policy_file.filename.endswith('.pdf'):
         raise HTTPException(
             status_code=400, 
             detail="Policy file must be a PDF"
@@ -45,17 +45,17 @@ async def analyze_invoices(
     try:
         # Process files in temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Save invoices ZIP
+            # Save uploaded files
+            policy_path = os.path.join(temp_dir, "policy.pdf")
             zip_path = os.path.join(temp_dir, "invoices.zip")
+            
+            # Write policy file
+            with open(policy_path, "wb") as f:
+                f.write(await policy_file.read())
+            
+            # Write invoices ZIP
             with open(zip_path, "wb") as f:
                 f.write(await invoices_zip.read())
-            
-            # Save policy file if provided
-            policy_path = None
-            if policy_file:
-                policy_path = os.path.join(temp_dir, "policy.pdf")
-                with open(policy_path, "wb") as f:
-                    f.write(await policy_file.read())
             
             # Extract invoices
             extract_dir = os.path.join(temp_dir, "invoices")
@@ -80,11 +80,11 @@ async def analyze_invoices(
                     "invoice_id": pdf_file.replace('.pdf', ''),
                     "employee_name": employee_name,
                     "file_name": pdf_file,
-                    "status": "Pending Analysis" if not policy_file else "Analyzed",
-                    "reason": "No policy provided for analysis" if not policy_file else "Analysis against provided policy",
+                    "status": "Pending Analysis",
+                    "reason": "LLM analysis not yet implemented",
                     "amount": "0.00",
                     "date": "2024-01-01",
-                    "policy_compliance": "Cannot determine without policy" if not policy_file else "Compliant"
+                    "policy_compliance": "Not analyzed"
                 }
                 
                 processed_invoices.append(analysis_result)
@@ -95,8 +95,7 @@ async def analyze_invoices(
                 "employee_name": employee_name,
                 "processed_count": len(processed_invoices),
                 "invoices": processed_invoices,
-                "policy_file": policy_file.filename if policy_file else "No policy provided",
-                "note": "Using default policy rules" if not policy_file else "Analysis against provided policy"
+                "policy_file": policy_file.filename
             }
             
     except zipfile.BadZipFile:
